@@ -26,6 +26,9 @@ public class AdminPanelUIController : MonoBehaviour
 
     private void Start()
     {
+        gameObject.GetComponentInParent<RectTransform>().gameObject.SetActive(false);
+        if (!SessionManager.Singleton.IsCurrentUserAdmin())
+            Destroy(this);
         searchbar.onValueChanged.AddListener(OnSearchValueChanged);
     }
 

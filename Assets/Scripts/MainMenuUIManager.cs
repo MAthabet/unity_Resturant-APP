@@ -1,6 +1,8 @@
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using UnityEngine.Networking;
 using UnityEngine.UI;
 
 public class MainMenuUIManager : MonoBehaviour
@@ -18,11 +20,13 @@ public class MainMenuUIManager : MonoBehaviour
     private Transform CategoriesNamesPanel;
     [SerializeField]
     private Transform MealScrollView;
+    [SerializeField]
+    private RectTransform[] panels;
 
     private Dictionary<int, GameObject> categoryPanels = new Dictionary<int, GameObject>();
-    private Transform[] panels;
+    
 
-    private int currentCatID;
+    private int currentCatID = -1;
     private void Awake()
     {
         if (Singleton == null)
@@ -37,16 +41,21 @@ public class MainMenuUIManager : MonoBehaviour
     private void Start()
     {
         BuildUI();
-        panels = gameObject.GetComponentsInChildren<Transform>();
+        //DisplayMainMenu();
+    }
+
+    private void DisplayMainMenu()
+    {
         int n = panels.Length;
-        for (int i = 0; i < n; i++)
+        for (int i = 1; i < n-1; i++)
         {
             panels[i].gameObject.SetActive(false);
         }
-        
-        panels[n-1].gameObject.SetActive(true);
+
+        panels[n - 1].gameObject.SetActive(true);
         panels[0].gameObject.SetActive(true);
     }
+
     void BuildUI()
     {
         List<MealCategories> allCategories = DatabaseManager.Singleton.GetAllCategories();
@@ -55,10 +64,10 @@ public class MainMenuUIManager : MonoBehaviour
         foreach (var category in allCategories)
         {
             GameObject newPanel = Instantiate(MealContentTemplet, MealScrollView);
-            newPanel.name = "{category.CategoryName} Panel";
+            newPanel.name = $"{category.CategoryName} Panel";
             int tempId = category.CategoryID;
             categoryPanels[tempId] = newPanel;
-            newPanel.SetActive(false);
+            
 
             GameObject newTab = Instantiate(CategoryButtonTemplet, CategoriesNamesPanel);
             newTab.GetComponent<CategoryTabController>().Setup(category.CategoryName, tempId);
@@ -70,20 +79,49 @@ public class MainMenuUIManager : MonoBehaviour
                 mealItem.GetComponent<MealItemController>().LoadMealUI(meal);
             }
 
-            
+            newPanel.SetActive(false);
         }
 
         if (allCategories.Count > 0)
         {
             int fisrtCatID = allCategories[0].CategoryID;
             DisplayCategoryPanel(fisrtCatID);
-            currentCatID = fisrtCatID;
         }
     }
     public void DisplayCategoryPanel(int catID)
     {
+        if (currentCatID == catID)
+            return;
+
         categoryPanels[catID].SetActive(true);
-        categoryPanels[currentCatID].SetActive(false);
+        if(currentCatID > 0)
+            categoryPanels[currentCatID].SetActive(false);
         currentCatID = catID;
+    }
+    public void StartImageLoad(MealItemController targetController, string imagePath)
+    {
+        StartCoroutine(LoadImageCoroutine(targetController, imagePath));
+    }
+
+    private IEnumerator LoadImageCoroutine(MealItemController targetController, string imagePath)
+    {
+        if (string.IsNullOrEmpty(imagePath) || targetController == null)
+        {
+            yield break;
+        }
+        using (UnityWebRequest uwr = UnityWebRequestTexture.GetTexture(imagePath))
+        {
+            yield return uwr.SendWebRequest();
+
+            if (uwr.result != UnityWebRequest.Result.Success)
+            {
+                Debug.Log(uwr.error);
+            }
+            else
+            {
+                Texture texture = DownloadHandlerTexture.GetContent(uwr);
+                targetController.SetImage(texture);
+            }
+        }
     }
 }

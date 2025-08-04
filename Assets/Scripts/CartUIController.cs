@@ -16,11 +16,14 @@ public class CartUIController : MonoBehaviour
     private void Start()
     {
         CartManager.OnCartChanged += HandleItemChange;
+        CartManager.OnCartCleared += RemoveAllItemsFromCart;
+        gameObject.SetActive(false);
     }
 
     private void OnDestroy()
     {
         CartManager.OnCartChanged -= HandleItemChange;
+        CartManager.OnCartCleared -= RemoveAllItemsFromCart;
     }
 
     private void HandleItemChange(Meals meal, int newQuantity)
@@ -51,9 +54,19 @@ public class CartUIController : MonoBehaviour
         Destroy(itemUIMap[meal]);
         itemUIMap.Remove(meal);
     }
+    private void RemoveAllItemsFromCart()
+    {
+        foreach(var meal in itemUIMap)
+        {
+            Destroy(itemUIMap[meal.Key]);
+        }
+        itemUIMap.Clear();
+        UpdateTotalPriceText();
+    }
 
     private void AddNewItemToCart(Meals meal)
     {
+        Debug.Log("adding to ui");
         GameObject newItem = Instantiate(CartUITemplet, CartScrollView);
         newItem.GetComponent<CartItemController>().Init(meal);
         itemUIMap[meal] = newItem;

@@ -10,12 +10,14 @@ public class CartManager : MonoBehaviour
     float discount = 0.0f;
 
     public static event Action<Meals, int> OnCartChanged;
+    public static event Action OnCartCleared;
 
     private void Awake()
     {
         if (Singleton == null)
         {
             Singleton = this;
+            cartItems = new Dictionary<Meals, int>();
         }
         else
         {
@@ -24,7 +26,6 @@ public class CartManager : MonoBehaviour
     }
     private void Start()
     {
-        cartItems = new Dictionary<Meals, int>();
     }
     public void AddToCart(Meals meal, int quantity)
     {
@@ -76,10 +77,14 @@ public class CartManager : MonoBehaviour
     public void MakeOrder()
     {
         int userID = SessionManager.Singleton.GetCurrntUserID();
-
         DatabaseManager.Singleton.AddOrder(userID, cartItems, GetCartTotalPrice());
+        ClearCart();
     }
-
+    private void ClearCart()
+    {
+        cartItems.Clear();
+        OnCartCleared?.Invoke();
+    }
     public int GetItemQuantity(Meals item)
     {
         return cartItems[item];

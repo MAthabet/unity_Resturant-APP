@@ -18,6 +18,7 @@ public class CartItemController : MonoBehaviour
     public void Init(Meals meal)
     {
         item = meal;
+        mealName.text = meal.MealName;
         UpdateQuantity(CartManager.Singleton.GetItemQuantity(meal));
         img.texture = MealImageData.GetMealImage(meal);
     }
@@ -30,9 +31,8 @@ public class CartItemController : MonoBehaviour
         quantityText.text = newQuantity.ToString();
         UpdateTotalPrice(newQuantity);
     }
-
     private void UpdateTotalPrice(int newQuantity)
     {
-        totalPriceText.text = $"${(item.Price * newQuantity):F2}";
+        totalPriceText.text = $"{(item.Price * newQuantity):F2} EGP";
     }
 }

@@ -33,35 +33,40 @@ public class MealItemController : MonoBehaviour
         description.text = meal.Description;
         price.text = $"${meal.Price:F2}";
         linkedMeal = meal;
-        StartCoroutine(LoadImage(meal.ImagePath));
+        MainMenuUIManager.Singleton.StartImageLoad(this, linkedMeal.ImagePath);
     }
-    private System.Collections.IEnumerator LoadImage(string imagePath)
-    {
-        if (string.IsNullOrEmpty(imagePath))
-        {
-            Debug.LogError("Image path is null or empty");
-            yield break;
-        }
-        using (UnityWebRequest uwr = UnityWebRequestTexture.GetTexture(imagePath))
-        {
-            yield return uwr.SendWebRequest();
-
-            if (uwr.result != UnityWebRequest.Result.Success)
-            {
-                Debug.Log(uwr.error);
-            }
-            else
-            {
-                Texture texture = DownloadHandlerTexture.GetContent(uwr);
-                MealImageData.SetMealImage(linkedMeal, texture);
-                img.texture = texture;
-            }
-        }
-    }
+    //private System.Collections.IEnumerator LoadImage(string imagePath)
+    //{
+    //    if (string.IsNullOrEmpty(imagePath))
+    //    {
+    //        yield break;
+    //    }
+    //    using (UnityWebRequest uwr = UnityWebRequestTexture.GetTexture(imagePath))
+    //    {
+    //        yield return uwr.SendWebRequest();
+    //        if (uwr.result != UnityWebRequest.Result.Success)
+    //        {
+    //            Debug.Log(uwr.error);
+    //        }
+    //        else
+    //        {
+    //            Texture texture = DownloadHandlerTexture.GetContent(uwr);
+    //            MealImageData.SetMealImage(linkedMeal, texture);
+    //            img.texture = texture;
+    //        }
+    //    }
+    //}
     public void ChangeQuantity(int n)
     {
-        if (int.TryParse(quantity_IF.text, out int currentQuantity))
+        if (int.TryParse(quantity_IF.text, out int currentQuantity) )
         {
+            currentQuantity += n;
+            if (currentQuantity < 0) currentQuantity = 0;
+            quantity_IF.text = currentQuantity.ToString();
+        }
+        else if(quantity_IF.text == "")
+        {
+            currentQuantity = 0;
             currentQuantity += n;
             if (currentQuantity < 0) currentQuantity = 0;
             quantity_IF.text = currentQuantity.ToString();
@@ -69,9 +74,10 @@ public class MealItemController : MonoBehaviour
     }
     private char OnValidateQuantity(char charToValidate)
     {
-        if (!char.IsDigit(charToValidate) || charToValidate != '\b')
+        if (!char.IsDigit(charToValidate))
         {
-            charToValidate = '\0';
+            if(charToValidate != '\b')
+                charToValidate = '\0';
         }
         else if (charToValidate == '0' && quantity_IF.text.Length == 0)
         {
@@ -91,7 +97,11 @@ public class MealItemController : MonoBehaviour
             quantity_IF.text = "";
         }
     }
-
+    public void SetImage(Texture image)
+    {
+        MealImageData.SetMealImage(linkedMeal, image);
+        img.texture = image;
+    }
     public void OnAddToCartClicked()
     {
         if(int.TryParse(quantity_IF.text, out int quantity) && quantity > 0)
