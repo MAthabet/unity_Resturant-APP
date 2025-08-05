@@ -26,6 +26,9 @@ public class CartManager : MonoBehaviour
     }
     private void Start()
     {
+        UpdateDiscount();
+        if(discount > 0.0f)
+            MainMenuUIManager.Singleton.ShowDiscountBanner();
     }
     public void AddToCart(Meals meal, int quantity)
     {
@@ -70,14 +73,18 @@ public class CartManager : MonoBehaviour
         
         return sum * (1 - discount);
     }
-    public void UpdateDiscount(float val)
+    private void UpdateDiscount()
     {
-        discount = val;
+        if (DatabaseManager.Singleton.IsUserEligableForDiscount(SessionManager.Singleton.GetCurrntUserID()) > -1)
+            discount = 0.1f;
+        else
+            discount = 0.0f;
     }
     public void MakeOrder()
     {
         int userID = SessionManager.Singleton.GetCurrntUserID();
-        DatabaseManager.Singleton.AddOrder(userID, cartItems, GetCartTotalPrice());
+        DatabaseManager.Singleton.AddOrder(userID, cartItems, GetCartTotalPrice(), discount);
+        discount = 0.0f;
         ClearCart();
     }
     private void ClearCart()

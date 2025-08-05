@@ -4,9 +4,6 @@ using System;
 using System.IO;
 using System.Collections.Generic;
 using System.Linq;
-using Unity.Android.Gradle.Manifest;
-using UnityEngine.SocialPlatforms.Impl;
-using UnityEditor.MemoryProfiler;
 
 public class DatabaseManager : MonoBehaviour
 {
@@ -14,7 +11,7 @@ public class DatabaseManager : MonoBehaviour
     [SerializeField]
     private string dbPath;
     private SQLiteConnection connection;
-
+    private DateTime lastWeeklyWinner;
     private void Awake()
     {
         if (Singleton == null)
@@ -26,6 +23,10 @@ public class DatabaseManager : MonoBehaviour
         else
             Destroy(this);
         
+    }
+    private void Start()
+    {
+        CheckAndRunWeeklyUpdate();
     }
     void Init()
     {
@@ -152,32 +153,77 @@ public class DatabaseManager : MonoBehaviour
     {
         connection.Insert(new GameScores { UserID = userID, Score = score, ScoreTime = DateTime.UtcNow });
     }
-    public void UpdateWeeklyWinners(int limit)
+    public void CheckAndRunWeeklyUpdate()
+    {
+        var newestWinner = connection.Table<WeeklyWinners>().OrderByDescending(w => w.EnteryDate).FirstOrDefault();
+
+        bool needsUpdate = false;
+
+        if (newestWinner == null)
+        {
+            needsUpdate = true;
+        }
+        else
+        {
+            DateTime oneWeekAgo = DateTime.UtcNow.AddDays(-7);
+            if (newestWinner.EnteryDate < oneWeekAgo)
+            {
+                needsUpdate = true;
+            }
+            
+        }
+
+        if (needsUpdate)
+        {
+            UpdateWeeklyWinners(3);
+            
+        }
+        else
+            lastWeeklyWinner = newestWinner.EnteryDate;
+    }
+    private void UpdateWeeklyWinners(int limit)
     {
         List<GameScores> topPlayers = GetLeaderboard(limit);
+        DeleteDublicatedWinners(topPlayers);
 
         foreach (var player in topPlayers)
         {
-            Func<WeeklyWinner, bool> searchQuery = w => w.UserID == player.UserID && w.UsedDate == null && w.EnteryDate.AddDays(7) < DateTime.UtcNow;
-            var existingWinner = connection.Table<WeeklyWinner>().FirstOrDefault(searchQuery);
-            if (existingWinner == null)
+            WeeklyWinners newWinner = new() { UserID = player.UserID, EnteryDate = DateTime.UtcNow };
+            connection.Insert(newWinner);
+        }
+        lastWeeklyWinner = DateTime.UtcNow;
+    }
+    private void DeleteDublicatedWinners(List<GameScores> topPlayers)
+    {
+        for (int i = 0; i < topPlayers.Count; i++)
+        {
+            for (int j = i + 1; j < topPlayers.Count; j++)
             {
-                var newWinner = new WeeklyWinner
+                if (topPlayers[i].UserID == topPlayers[j].UserID)
                 {
-                    UserID = player.UserID,
-                    EnteryDate = DateTime.UtcNow
-                };
-                connection.Insert(newWinner);
+                    if (topPlayers[i].Score < topPlayers[j].Score)
+                    {
+                        topPlayers.RemoveAt(i);
+                        i--;
+                        break;
+                    }
+                    else
+                    {
+                        topPlayers.RemoveAt(j);
+                        j--;
+                    }
+                }
             }
         }
     }
     public List<GameScores> GetLeaderboard(int limit)
     {
-        return connection.Table<GameScores>().OrderByDescending(s => s.Score).Where(s => s.ScoreTime.AddDays(7) < DateTime.UtcNow).Take(limit).ToList();
+        DateTime oneWeekAgo = DateTime.UtcNow.AddDays(-7);
+        return connection.Table<GameScores>().OrderByDescending(s => s.Score).Where(s => s.ScoreTime > oneWeekAgo).Take(limit).ToList();
     }
     public int IsUserEligableForDiscount(int userId)
     {
-        WeeklyWinner eligibleWin = getWinner(userId);
+        WeeklyWinners eligibleWin = getWinner(userId);
 
         if (eligibleWin != null)
             return eligibleWin.WinnerID;
@@ -185,11 +231,11 @@ public class DatabaseManager : MonoBehaviour
             return -1;
     }
 
-    private WeeklyWinner getWinner(int userId)
+    private WeeklyWinners getWinner(int userId)
     {
         DateTime oneWeekAgo = DateTime.UtcNow.AddDays(-7);
 
-        var eligibleWin = connection.Table<WeeklyWinner>().FirstOrDefault(w => w.UserID == userId && w.UsedDate == null && w.EnteryDate >= oneWeekAgo);
+        var eligibleWin = connection.Table<WeeklyWinners>().FirstOrDefault(w => w.UserID == userId && w.UsedDate == null && w.EnteryDate >= oneWeekAgo);
         return eligibleWin;
     }
 

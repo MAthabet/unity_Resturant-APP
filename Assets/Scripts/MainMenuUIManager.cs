@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using UnityEngine.Networking;
-using UnityEngine.UI;
 
 public class MainMenuUIManager : MonoBehaviour
 {
@@ -24,6 +23,8 @@ public class MainMenuUIManager : MonoBehaviour
     private RectTransform[] panels;
     [SerializeField]
     AdminPanelUIController adminPanelUIController;
+    [SerializeField]
+    private GameObject discountBanner;
 
     private Dictionary<int, GameObject> categoryPanels = new Dictionary<int, GameObject>();
     
@@ -130,5 +131,9 @@ public class MainMenuUIManager : MonoBehaviour
     public void OpenEditMealMenu(Meals meal)
     {
         adminPanelUIController.ShowPanelForEdit(meal);
+    }
+    public void ShowDiscountBanner()
+    {
+        discountBanner.SetActive(true);
     }
 }

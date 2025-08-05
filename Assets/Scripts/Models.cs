@@ -92,7 +92,7 @@ public class MealCategories
     public string CategoryName { get; set; }
 }
 
-public class WeeklyWinner
+public class WeeklyWinners
 {
     [PrimaryKey, AutoIncrement]
     public int WinnerID { get; set; }

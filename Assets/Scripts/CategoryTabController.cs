@@ -1,8 +1,6 @@
 using UnityEngine;
 using TMPro;
-using Unity.Android.Gradle.Manifest;
 using UnityEngine.UI;
-using System;
 
 public class CategoryTabController : MonoBehaviour
 {
