@@ -6,11 +6,17 @@ public class SearchItemController : MonoBehaviour
     [SerializeField]
     TMP_Text mealNameText;
 
-    private int MealID;
+    private Meals MealToEdit;
 
-    public void LoadSearchUI(int mealID, string mealName)
+    public void LoadSearchUI(Meals meal)
     {
-        MealID = mealID;
-        mealNameText.text = mealName;
+        MealToEdit = meal;
+        mealNameText.text = MealToEdit.MealName;
     }
+
+    public void OpenEditMenu()
+    {
+        MainMenuUIManager.Singleton.OpenEditMealMenu(MealToEdit);
+    }
+
 }

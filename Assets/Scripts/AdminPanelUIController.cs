@@ -23,12 +23,17 @@ public class AdminPanelUIController : MonoBehaviour
     private TMP_InputField mealDiscription;
     [SerializeField]
     private TMP_InputField mealCategory;
+    [SerializeField]
+    private GameObject EditPanel;
+
+    private Meals currentMeal;
+
+    public static event Action OnMealDataChanged;
 
     private void Start()
     {
-        gameObject.GetComponentInParent<RectTransform>().gameObject.SetActive(false);
         if (!SessionManager.Singleton.IsCurrentUserAdmin())
-            Destroy(this);
+            Destroy(this.gameObject);
         searchbar.onValueChanged.AddListener(OnSearchValueChanged);
     }
 
@@ -44,7 +49,7 @@ public class AdminPanelUIController : MonoBehaviour
         foreach (Meals meal in searchResults)
         {
             GameObject newItem = Instantiate(searchUITemplet, searchScrollView);
-            newItem.GetComponent<SearchItemController>().LoadSearchUI(meal.MealID, meal.MealName);
+            newItem.GetComponent<SearchItemController>().LoadSearchUI(meal);
         }
     }
     public void OnSaveChangesClicked()
@@ -71,15 +76,53 @@ public class AdminPanelUIController : MonoBehaviour
         }
         if (flag)
         {
-            DatabaseManager.Singleton.AddMeal(mealName.text, price, mealCategory.text, true, mealImgLink.text, mealDiscription.text);
-            mealName.text = "";
-            mealPrice.text = "";
-            mealImgLink.text = "";
-            mealDiscription.text = "";
-            mealCategory.text = "";
+            if (currentMeal == null)
+            { 
+                DatabaseManager.Singleton.AddMeal(mealName.text, price, mealCategory.text, true, mealImgLink.text, mealDiscription.text);
+                ClearAllInputs();
+            }
+            else
+            {
+                currentMeal.MealName = mealName.text;
+                currentMeal.Price = price;
+                currentMeal.Description = mealDiscription.text;
+                currentMeal.ImagePath = mealImgLink.text;
+
+                DatabaseManager.Singleton.UpdateMeal(currentMeal, mealCategory.text);
+            }
+            
+            OnMealDataChanged?.Invoke();
         }
-        
-        
+
+
+    }
+    public void ShowPanelForNewMeal()
+    {
+        currentMeal = null;
+
+        ClearAllInputs();
+
+        EditPanel.SetActive(true);
     }
 
+    public void ShowPanelForEdit(Meals mealToEdit)
+    {
+        currentMeal = mealToEdit;
+
+        mealName.text = mealToEdit.MealName;
+        mealPrice.text = mealToEdit.Price.ToString("F2");
+        mealDiscription.text = mealToEdit.Description;
+        mealImgLink.text = mealToEdit.ImagePath;
+        mealCategory.text = DatabaseManager.Singleton.GetCategoryName(mealToEdit.CategoryID);
+
+        EditPanel.SetActive(true);
+    }
+    private void ClearAllInputs()
+    {
+        mealName.text = "";
+        mealPrice.text = "";
+        mealImgLink.text = "";
+        mealDiscription.text = "";
+        mealCategory.text = "";
+    }
 }

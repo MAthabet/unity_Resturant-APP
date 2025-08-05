@@ -4,6 +4,9 @@ using System;
 using System.IO;
 using System.Collections.Generic;
 using System.Linq;
+using Unity.Android.Gradle.Manifest;
+using UnityEngine.SocialPlatforms.Impl;
+using UnityEditor.MemoryProfiler;
 
 public class DatabaseManager : MonoBehaviour
 {
@@ -37,7 +40,10 @@ public class DatabaseManager : MonoBehaviour
         email.ToLower();
         return connection.Table<Users>().Where(u => u.Email == email).FirstOrDefault();
     }
-
+    public Users GetUser(int userID)
+    {
+        return connection.Table<Users>().Where(u => u.UserID == userID).FirstOrDefault();
+    }
     public void AddUser(string email,string phoneNumber, string fn, string ln, string password, bool isAdmin = false)
     {
         email.ToLower();
@@ -50,22 +56,37 @@ public class DatabaseManager : MonoBehaviour
     }
     public void AddMeal(string mealName, float price, string category, bool available = true, string imagePath = "", string description = "")
     {
-        var cat = connection.Table<MealCategories>().Where(c => c.CategoryName == category).FirstOrDefault();
-        if(cat == null)
-        {
-            cat = new MealCategories();
-            cat.CategoryName = category;
-            connection.Insert(cat);
-        }
+        MealCategories cat = AddCategory(category);
         Meals newMeal = new() { MealName = mealName, Price = price, CategoryID = cat.CategoryID, Description = description, ImagePath = imagePath, Available = available };
         connection.Insert(newMeal);
+    }
+    public void UpdateMeal(Meals meal, string category)
+    {
+        MealCategories cat = AddCategory(category);
+        meal.CategoryID = cat.CategoryID;
+        connection.Update(meal);
     }
     public List<MealCategories> GetAllCategories() 
     {
         return connection.Table<MealCategories>().ToList();
     }
+    public String GetCategoryName(int categoryID) 
+    {
+        MealCategories cat = connection.Table<MealCategories>().Where(c => c.CategoryID == categoryID).FirstOrDefault();
+        return cat.CategoryName;
+    }
+    private MealCategories AddCategory(string category)
+    {
+        var cat = connection.Table<MealCategories>().Where(c => c.CategoryName == category).FirstOrDefault();
+        if (cat == null)
+        {
+            cat = new MealCategories();
+            cat.CategoryName = category;
+            connection.Insert(cat);
+        }
 
-
+        return cat;
+    }
     public void UpdateMealPrice(int mealId, float newPrice)
     {
         var meal = connection.Table<Meals>().Where(m => m.MealID == mealId).FirstOrDefault();
@@ -94,27 +115,21 @@ public class DatabaseManager : MonoBehaviour
     }
     public void AddOrder(int userID, Dictionary<Meals, int> orderItems, float totalCost, float discount = 0.0f)
     {
-        Orders newOrder = new() { UserID = userID, Discount = discount, TotalCost = totalCost};
+        Orders newOrder = new() { UserID = userID, Discount = discount, TotalCost = totalCost, OrderDate = DateTime.UtcNow};
         connection.Insert(newOrder);
         foreach(var item in orderItems)
         {
             AddOrderItems(newOrder.OrderID, item.Key.MealID, item.Value);
+        }
+        if(discount > 0.0f)
+        {
+            UseWinnerDiscount(userID);
         }
     }
     private void AddOrderItems(int orderID, int mealID,int quantity)
     {
         OrderItems newOrderItem = new() { OrderID = orderID, MealID = mealID, Quantity = quantity};
         connection.Insert(newOrderItem);
-    }
-    public void SaveScore(int userId, int score)
-    {
-        GameScores newScore = new(){ UserID = userId, Score = score};
-        connection.Insert(newScore);
-    }
-
-    public List<GameScores> GetLeaderboard()
-    {
-        return connection.Table<GameScores>().OrderByDescending(s => s.Score).Take(10).ToList();
     }
     public List<Meals> SearchMealsByName(string mealName)
     {
@@ -127,5 +142,65 @@ public class DatabaseManager : MonoBehaviour
                 string sql = "SELECT * FROM Meals WHERE LOWER(MealName) LIKE ?";
                 return connection.Query<Meals>(sql, $"%{mealName.ToLower()}%");
             }
+    }
+    public void SaveScore(int userId, int score)
+    {
+        GameScores newScore = new() { UserID = userId, Score = score };
+        connection.Insert(newScore);
+    }
+    public void AddScore(int score, int userID)
+    {
+        connection.Insert(new GameScores { UserID = userID, Score = score, ScoreTime = DateTime.UtcNow });
+    }
+    public void UpdateWeeklyWinners(int limit)
+    {
+        List<GameScores> topPlayers = GetLeaderboard(limit);
+
+        foreach (var player in topPlayers)
+        {
+            Func<WeeklyWinner, bool> searchQuery = w => w.UserID == player.UserID && w.UsedDate == null && w.EnteryDate.AddDays(7) < DateTime.UtcNow;
+            var existingWinner = connection.Table<WeeklyWinner>().FirstOrDefault(searchQuery);
+            if (existingWinner == null)
+            {
+                var newWinner = new WeeklyWinner
+                {
+                    UserID = player.UserID,
+                    EnteryDate = DateTime.UtcNow
+                };
+                connection.Insert(newWinner);
+            }
+        }
+    }
+    public List<GameScores> GetLeaderboard(int limit)
+    {
+        return connection.Table<GameScores>().OrderByDescending(s => s.Score).Where(s => s.ScoreTime.AddDays(7) < DateTime.UtcNow).Take(limit).ToList();
+    }
+    public int IsUserEligableForDiscount(int userId)
+    {
+        WeeklyWinner eligibleWin = getWinner(userId);
+
+        if (eligibleWin != null)
+            return eligibleWin.WinnerID;
+        else
+            return -1;
+    }
+
+    private WeeklyWinner getWinner(int userId)
+    {
+        DateTime oneWeekAgo = DateTime.UtcNow.AddDays(-7);
+
+        var eligibleWin = connection.Table<WeeklyWinner>().FirstOrDefault(w => w.UserID == userId && w.UsedDate == null && w.EnteryDate >= oneWeekAgo);
+        return eligibleWin;
+    }
+
+    private void UseWinnerDiscount(int userID)
+    {
+        var winnerRecord = getWinner(userID);
+
+        if (winnerRecord != null)
+        {
+            winnerRecord.UsedDate = DateTime.UtcNow;
+            connection.Update(winnerRecord);
+        }
     }
 }

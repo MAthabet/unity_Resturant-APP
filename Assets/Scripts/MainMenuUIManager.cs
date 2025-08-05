@@ -22,6 +22,8 @@ public class MainMenuUIManager : MonoBehaviour
     private Transform MealScrollView;
     [SerializeField]
     private RectTransform[] panels;
+    [SerializeField]
+    AdminPanelUIController adminPanelUIController;
 
     private Dictionary<int, GameObject> categoryPanels = new Dictionary<int, GameObject>();
     
@@ -123,5 +125,10 @@ public class MainMenuUIManager : MonoBehaviour
                 targetController.SetImage(texture);
             }
         }
+    }
+
+    public void OpenEditMealMenu(Meals meal)
+    {
+        adminPanelUIController.ShowPanelForEdit(meal);
     }
 }

@@ -91,3 +91,15 @@ public class MealCategories
     [NotNull]
     public string CategoryName { get; set; }
 }
+
+public class WeeklyWinner
+{
+    [PrimaryKey, AutoIncrement]
+    public int WinnerID { get; set; }
+
+    [NotNull, Indexed]
+    public int UserID { get; set; }
+    [NotNull]
+    public DateTime EnteryDate { get; set; }
+    public DateTime? UsedDate { get; set; }
+}
