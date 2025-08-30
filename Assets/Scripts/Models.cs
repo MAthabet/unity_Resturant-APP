@@ -103,3 +103,9 @@ public class WeeklyWinners
     public DateTime EnteryDate { get; set; }
     public DateTime? UsedDate { get; set; }
 }
+
+public class MealNameCount
+{
+    public string MealName { get; set; }
+    public int  count { get; set; }
+}

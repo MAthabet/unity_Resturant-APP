@@ -11,7 +11,8 @@ public class DatabaseManager : MonoBehaviour
     [SerializeField]
     private string dbPath;
     private SQLiteConnection connection;
-    private DateTime lastWeeklyWinner;
+    private SQLiteConnection ro_connection;
+    private DateTime lastWeeklyEntry;
     private void Awake()
     {
         if (Singleton == null)
@@ -31,7 +32,10 @@ public class DatabaseManager : MonoBehaviour
     void Init()
     {
         if (File.Exists(dbPath))
+        {
             connection = new SQLiteConnection(dbPath, SQLiteOpenFlags.ReadWrite);
+            ro_connection = new SQLiteConnection(dbPath, SQLiteOpenFlags.ReadOnly);
+        }
         else
             Debug.LogWarning("DB Was not found");
     }
@@ -132,6 +136,33 @@ public class DatabaseManager : MonoBehaviour
         OrderItems newOrderItem = new() { OrderID = orderID, MealID = mealID, Quantity = quantity};
         connection.Insert(newOrderItem);
     }
+    public Dictionary<string,int> GetOrderItems(int orderID)
+    {
+        Dictionary<string, int> orderItems = new Dictionary<string, int>();
+        var items = connection.Table<OrderItems>().Where(oi => oi.OrderID == orderID).ToList();
+        foreach (var item in items)
+        {
+            var meal = connection.Table<Meals>().Where(m => m.MealID == item.MealID).FirstOrDefault();
+            if (meal != null)
+            {
+                orderItems[meal.MealName] = item.Quantity;
+            }
+        }
+        return orderItems;
+    }
+    public List<Orders> GetAllOrdersByStatus(OrderStatus status)
+    {
+        return ro_connection.Table<Orders>().Where(o => o.Status == status).ToList();
+    }
+    public void UpdateOrderStatus(int orderId, OrderStatus newStatus)
+    {
+        var order = connection.Table<Orders>().Where(o => o.OrderID == orderId).FirstOrDefault();
+        if (order != null)
+        {
+            order.Status = newStatus;
+            connection.Update(order);
+        }
+    }
     public List<Meals> SearchMealsByName(string mealName)
     {
             if (string.IsNullOrEmpty(mealName))
@@ -179,7 +210,7 @@ public class DatabaseManager : MonoBehaviour
             
         }
         else
-            lastWeeklyWinner = newestWinner.EnteryDate;
+            lastWeeklyEntry = newestWinner.EnteryDate;
     }
     private void UpdateWeeklyWinners(int limit)
     {
@@ -191,7 +222,7 @@ public class DatabaseManager : MonoBehaviour
             WeeklyWinners newWinner = new() { UserID = player.UserID, EnteryDate = DateTime.UtcNow };
             connection.Insert(newWinner);
         }
-        lastWeeklyWinner = DateTime.UtcNow;
+        lastWeeklyEntry = DateTime.UtcNow;
     }
     private void DeleteDublicatedWinners(List<GameScores> topPlayers)
     {
@@ -249,4 +280,40 @@ public class DatabaseManager : MonoBehaviour
             connection.Update(winnerRecord);
         }
     }
+
+    public List<MealNameCount> GetOrdersStats()
+    {
+        var result = connection.Query<MealNameCount>("select MealName, count (MealName) as count from (SELECT MealName From OrderItems inner join meals where OrderItems.MealID = meals.MealID) GROUP by MealName");
+        
+        return result;
+    }
+    public List<UserOrderStatistic> GetUserOrderStatistics()
+    {
+        using (var connection = new SQLiteConnection(dbPath, SQLiteOpenFlags.ReadOnly))
+        {
+            // This query joins Users, Orders, and OrderItems, groups the results
+            // by user, and calculates the total quantity of items for each one.
+            string sql = @"
+            SELECT 
+                u.FirstName, 
+                SUM(oi.Quantity) as TotalItemsOrdered
+            FROM 
+                Users u
+            INNER JOIN 
+                Orders o ON u.UserID = o.UserID
+            INNER JOIN 
+                OrderItems oi ON o.OrderID = oi.OrderID
+            GROUP BY 
+                u.FirstName
+            ORDER BY 
+                TotalItemsOrdered DESC";
+
+            return connection.Query<UserOrderStatistic>(sql);
+        }
+    }
+}
+public class UserOrderStatistic
+{
+    public string FirstName { get; set; }
+    public int TotalItemsOrdered { get; set; }
 }
